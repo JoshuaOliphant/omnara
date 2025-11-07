@@ -56,8 +56,21 @@ postgres-data/
 logs/
 *.log
 test-venv/
-.claude/
 
 .expo/
 
 internal_docs/
+
+# ADW (AI Developer Workflows) Artifacts
+agents/          # Agent execution outputs and state files
+trees/           # Git worktrees for isolated development
+specs/plans/     # Generated TDD plans (optionally commit these)
+.ports.env       # Worktree port assignments
+
+# Claude Code Settings (DO commit slash commands and docs)
+.claude/*
+!.claude/commands/
+!.claude/*.md
+
+# beads
+agents/

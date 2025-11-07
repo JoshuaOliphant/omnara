@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Note**: This project uses [bd (beads)](https://github.com/steveyegge/beads) for issue tracking. Use `bd` commands instead of markdown TODOs. See AGENTS.md for workflow details.
+
 ## Project Overview
 
 Omnara is a platform that enables real-time monitoring and interaction with AI agents (Claude Code, Codex CLI, n8n workflows, etc.) through mobile, web, and API interfaces. Users can see what their agents are doing and respond to questions instantly.
@@ -255,6 +257,404 @@ Omnara is published to PyPI as `omnara`:
 - CLI entry point: `omnara.cli:main`
 - Includes: CLI, SDK, MCP server, agent wrappers
 - Install: `pip install omnara` or `uv tool install omnara`
+
+## AI Developer Workflows (ADWs)
+
+Omnara includes a complete ADW (AI Developer Workflows) infrastructure for programmatic agent orchestration. This enables Claude Code agents to be invoked programmatically for planning, implementing, testing, reviewing, and deploying features with full worktree isolation.
+
+### Overview
+
+ADWs provide three capability tiers:
+1. **Minimal**: Core subprocess execution, basic prompts
+2. **Enhanced**: SDK support, compound workflows, TDD planning
+3. **Scaled**: Worktree isolation, multi-phase SDLC, beads integration (✅ **Installed**)
+
+### Quick Start
+
+```bash
+# Execute an adhoc prompt
+./adws/adw_prompt.py "Analyze the authentication flow"
+
+# Plan a chore
+./adws/adw_slash_command.py /chore $(uuidgen | cut -c1-8) "add error handling"
+
+# Full SDLC workflow (plan → build → test → review → document)
+./adws/adw_sdlc_iso.py <beads-task-id>
+
+# Interactive beads workflow picker
+./adws/adw_beads_ready.py
+```
+
+### Directory Structure
+
+```
+adws/
+├── adw_modules/          # Core execution engines
+│   ├── agent.py          # Subprocess-based execution
+│   ├── agent_sdk.py      # SDK-based execution
+│   ├── state.py          # Workflow state management
+│   ├── git_ops.py        # Git operations
+│   ├── worktree_ops.py   # Worktree + port management
+│   ├── workflow_ops.py   # Workflow orchestration
+│   ├── beads_integration.py  # Beads issue tracker
+│   └── github.py         # GitHub integration
+├── adw_prompt.py         # CLI: Adhoc prompts
+├── adw_chore_implement.py  # Workflow: Plan + implement
+├── adw_plan_tdd.py       # Workflow: TDD task breakdown
+├── adw_plan_iso.py       # Phase: Planning (isolated)
+├── adw_build_iso.py      # Phase: Implementation
+├── adw_test_iso.py       # Phase: Testing
+├── adw_review_iso.py     # Phase: Review + auto-fix
+├── adw_document_iso.py   # Phase: Documentation
+├── adw_ship_iso.py       # Phase: Merge to main
+├── adw_sdlc_iso.py       # Composite: Full SDLC
+└── adw_beads_ready.py    # Interactive: Beads picker
+
+.claude/commands/         # Slash command templates
+├── chore.md             # Chore planning
+├── feature.md           # Feature planning
+├── implement.md         # Implementation
+├── test.md              # Test execution
+├── review.md            # Code review
+├── document.md          # Documentation generation
+└── [15+ more commands]
+
+specs/                   # Generated plans
+agents/                  # Execution outputs & state
+trees/                   # Git worktrees (isolated)
+```
+
+### Key Workflows
+
+#### Adhoc Prompt Execution
+```bash
+# Quick one-off prompts
+./adws/adw_prompt.py "Explain the database schema"
+./adws/adw_prompt.py "Find security vulnerabilities" --model opus
+
+# With custom working directory
+./adws/adw_prompt.py "Analyze tests" --working-dir src/backend/tests/
+```
+
+#### Chore Planning + Implementation
+```bash
+# Generate plan, then implement
+./adws/adw_chore_implement.py "add rate limiting to API endpoints"
+
+# Manual two-step process
+./adws/adw_slash_command.py /chore abc123 "add logging"
+./adws/adw_slash_command.py /implement specs/chore-abc123-*.md
+```
+
+#### TDD Planning for Large Tasks
+```bash
+# Break down a large feature into agent-sized tasks
+./adws/adw_plan_tdd.py "Implement real-time collaboration with WebSockets"
+
+# From a spec file
+./adws/adw_plan_tdd.py specs/feature-auth.md --spec-file
+
+# Use Opus for complex architecture
+./adws/adw_plan_tdd.py "Build event sourcing system" --model opus
+
+# Output: specs/plans/plan-{id}.md with:
+# - 25 tasks broken down (agent-optimized sizing)
+# - Dependency graph and phases
+# - TDD guidance for each task
+# - Agent-centric complexity metrics (context load, iterations)
+```
+
+#### Individual SDLC Phases (Worktree Isolation)
+```bash
+# 1. Planning phase - Creates worktree, allocates ports, generates plan
+./adws/adw_plan_iso.py poc-123
+
+# 2. Implementation phase - Executes plan in isolated worktree
+./adws/adw_build_iso.py poc-123 <adw-id>
+
+# 3. Testing phase - Runs test suite
+./adws/adw_test_iso.py poc-123 <adw-id>
+
+# 4. Review phase - Reviews code, auto-fixes blocking issues
+./adws/adw_review_iso.py poc-123 <adw-id>
+
+# 5. Documentation phase - Generates docs with screenshots
+./adws/adw_document_iso.py poc-123 <adw-id>
+
+# 6. Shipping phase - Merges to main, closes issue
+./adws/adw_ship_iso.py poc-123 <adw-id>
+```
+
+#### Composite SDLC Workflows
+```bash
+# Full SDLC (all 5 phases)
+./adws/adw_sdlc_iso.py poc-123
+
+# Partial SDLC (skip documentation)
+./adws/adw_plan_build_test_review_iso.py poc-123
+
+# Skip end-to-end tests (faster)
+./adws/adw_sdlc_iso.py poc-123 --skip-e2e
+
+# Skip auto-resolution of review issues
+./adws/adw_sdlc_iso.py poc-123 --skip-resolution
+```
+
+#### Interactive Beads Workflows
+```bash
+# Pick from ready tasks, run full SDLC
+./adws/adw_beads_ready.py
+
+# Pick task, run partial workflow
+./adws/adw_beads_ready.py --workflow plan-build-test-review
+```
+
+### Worktree Isolation
+
+Every ADW execution gets its own isolated environment:
+
+**Worktree Location**: `trees/{adw_id}/`
+- Fresh checkout from `origin/main`
+- Fully isolated git working directory
+- Independent package installation
+- Preserved for debugging after completion
+
+**Port Allocation**: Deterministic based on ADW ID
+- Backend: 9100-9114 (15 slots)
+- Frontend: 9200-9214 (15 slots)
+- Prevents conflicts when running parallel workflows
+- Configured via `.ports.env` in worktree
+
+**State Management**: `agents/{adw_id}/adw_state.json`
+- Persistent across workflow phases
+- Tracks: issue, branch, plan, ports, worktree path
+- Validated with Pydantic models
+
+### Issue Tracking Integration
+
+**Beads (Local SQLite)** - Primary system for Omnara:
+```bash
+# Create task
+bd add "Add real-time notifications" --type feature
+
+# List ready tasks
+bd ready
+
+# Show task details
+bd show poc-123
+
+# ADW workflows automatically:
+# - Fetch beads issues
+# - Update status to "in_progress"
+# - Close on successful ship
+```
+
+**GitHub Issues** - Also supported:
+```bash
+# Fetch by issue number
+./adws/adw_plan_iso.py 42
+
+# ADW workflows automatically:
+# - Fetch issue details
+# - Post status comments
+# - Link to PR on ship
+```
+
+### Configuration
+
+**Mode A: Claude Max Subscription (Default)**
+- No configuration needed
+- Claude Code authenticates via subscription
+- Perfect for interactive development
+
+**Mode B: API-Based Automation**
+```bash
+# Create .env file
+cp .env.sample .env
+
+# Add API key
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
+
+# Now workflows work in headless mode (CI/CD, webhooks)
+```
+
+**Optional: GitHub Integration**
+```bash
+# Add GitHub PAT to .env for GitHub issue operations
+echo "GITHUB_PAT=ghp_..." >> .env
+```
+
+### Output & Observability
+
+All ADW executions create structured outputs in `agents/{adw_id}/`:
+
+```
+agents/abc12345/
+├── adw_state.json          # Persistent state
+├── planner/                # Planning agent outputs
+│   ├── cc_raw_output.jsonl    # Raw JSONL stream
+│   ├── cc_raw_output.json     # Parsed JSON array
+│   ├── cc_final_object.json   # Final result object
+│   └── custom_summary_output.json  # High-level summary
+├── implementor/            # Implementation outputs
+├── test_validator/         # Test results
+└── review_agent/           # Review findings + screenshots
+    └── review_img/         # UI screenshots
+```
+
+### Slash Commands
+
+ADW workflows execute via slash commands defined in `.claude/commands/`:
+
+**Planning**:
+- `/chore` - Plan small maintenance tasks
+- `/feature` - Plan new features with user stories
+- `/bug` - Plan bug fixes with reproduction steps
+- `/plan-tdd` - Break large tasks into agent-sized chunks
+
+**Execution**:
+- `/implement` - Execute a plan file
+- `/patch` - Quick fix for review findings
+- `/test` - Run test suite with structured output
+- `/review` - Code review with auto-fix capability
+- `/document` - Generate documentation with screenshots
+
+**Workflow Management**:
+- `/install_worktree` - Set up worktree dependencies
+- `/cleanup_worktrees` - Remove stale worktrees
+- `/classify_issue` - Determine issue type
+- `/generate_branch_name` - Create standardized branch name
+- `/pull_request` - Generate PR description
+
+### Agent-Centric Task Sizing
+
+ADW uses **agent-centric complexity metrics** (not human time estimates):
+
+**Size S** (Simple):
+- Read 1-2 files, modify 1-2
+- Write 5-10 tests
+- 1-2 iterations expected
+- Example: "Add logging to endpoint"
+
+**Size M** (Medium):
+- Read 3-5 files, modify 2-4
+- Write 10-20 tests
+- 2-4 iterations expected
+- Example: "Refactor authentication module"
+
+**Size L** (Large):
+- Read 6+ files, modify 3-5
+- Write 20+ tests
+- 4-6+ iterations expected
+- Example: "Implement WebSocket real-time updates"
+
+**Rationale**: Measures **context switching cost** and **iteration depth**, not developer time.
+
+### Advanced Features
+
+**Auto-Resolution in Review Phase**:
+```bash
+# Review phase automatically fixes blocking issues
+./adws/adw_review_iso.py poc-123 <adw-id>
+
+# Creates patch plans for each blocker
+# Implements patches using separate agents
+# Re-reviews until blockers are resolved
+
+# Skip auto-resolution if needed
+./adws/adw_review_iso.py poc-123 <adw-id> --skip-resolution
+```
+
+**State Passing Between Phases**:
+- Persistent: File-based JSON (`adw_state.json`)
+- Validated: Pydantic schemas enforce correctness
+- Portable: Can resume workflows on different machines
+
+**Port Conflict Prevention**:
+- Deterministic allocation based on ADW ID hash
+- Automatic fallback if ports occupied
+- Stored in `.ports.env` for worktree services
+
+### Cleanup
+
+**Worktrees** (manual cleanup):
+```bash
+# List all worktrees
+git worktree list
+
+# Remove specific worktree
+git worktree remove trees/abc12345
+
+# Automated cleanup
+./adws/adw_slash_command.py /cleanup_worktrees
+```
+
+**State Files** (safe to delete after workflow complete):
+```bash
+# Remove specific ADW outputs
+rm -rf agents/abc12345/
+
+# Clean all agent outputs (nuclear option)
+rm -rf agents/
+```
+
+### Troubleshooting
+
+**Claude Code not found**:
+```bash
+# Verify installation
+claude --version
+
+# Set explicit path in .env
+echo "CLAUDE_CODE_PATH=/path/to/claude" >> .env
+```
+
+**Import errors in worktree**:
+```bash
+# Reinstall dependencies
+cd trees/{adw-id}/
+pip install -e .
+```
+
+**Port conflicts**:
+```bash
+# Check assigned ports
+cat trees/{adw-id}/.ports.env
+
+# Verify availability
+lsof -i :9100
+```
+
+**Worktree validation errors**:
+```bash
+# Three-way check: state + filesystem + git
+git worktree list                    # Git's view
+ls -la trees/{adw-id}/               # Filesystem
+cat agents/{adw-id}/adw_state.json   # State file
+
+# If mismatched, remove and recreate
+git worktree remove trees/{adw-id}/ --force
+./adws/adw_plan_iso.py <issue-id>  # Recreates worktree
+```
+
+### Best Practices
+
+1. **Use worktree isolation for all non-trivial work** - Prevents conflicts
+2. **Run full SDLC before shipping** - Ensures quality gates pass
+3. **Let review phase auto-fix blockers** - Saves manual iteration
+4. **Use TDD planning for large features** - Breaks into agent-sized tasks
+5. **Preserve worktrees after completion** - Valuable for debugging
+6. **Track ADW IDs in commit messages** - Improves traceability
+
+### Integration with Omnara Development
+
+ADWs are **production-ready** for Omnara development:
+- ✅ Adapted to monorepo structure (Python + TypeScript)
+- ✅ Uses Makefile commands (`make test`, `make lint`)
+- ✅ Respects dual auth system (Supabase + custom JWT)
+- ✅ Handles database migrations correctly (run from main repo)
+- ✅ Supports both backend and frontend development
+- ✅ Integrated with Beads for offline-first issue tracking
 
 ## Docs
 
